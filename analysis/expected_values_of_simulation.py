@@ -7,31 +7,50 @@ sys.path.append('../../enrichment/src')
 
 from multi_isotope_calculator import Multi_isotope
 
+DATA_PATH = '../data/'
 CORE_MASS = 110820  # in kg
 REFUELLING_TIME = 6  # in days
 SEPARATION_EFFICIENCY = 0.97 
 SIM_DUR = 730  # in days
 
 def main():
-    #expected_plutonium()
-    #expected_heu(22)
-    #expected_heu(88)
-    spent_reprocessed_uranium(22, verbose=False)
-    spent_reprocessed_uranium(88, verbose=False)
+    spent_natU_fname = os.path.join(DATA_PATH,
+            "SERPENT_outputs_NatU_percentages.npy")
+
+    get_expectations(spent_natU_fname, 22, '0.5MWd', True)
+    get_expectations(spent_natU_fname, 88, '2MWd', True)
 
     return
 
-def expected_heu(irradiation_time):
+def get_expectations(fname, irradiation_time, burnup, verbose=True):
+    """Run all the calculations for one simulation""" 
+    
+    print(f"Expected values for a cycle with burnup {burnup} and "
+          + f"irradiation time {irradiation_time}:\n")
+
+    reactor_cycles(irradiation_time, verbose=True)
+    natU_to_repU_cycles(fname, irradiation_time, burnup, verbose)
+    expected_plutonium(burnup, irradiation_time)
+    expected_heu(fname, irradiation_time, burnup)
+    spent_reprocessed_uranium(burnup, irradiation_time, verbose)
+    print("\n\n")
+    
+    return
+
+def expected_heu(fname, irradiation_time, burnup):
     """Get the expected amount of weapongrade U produced"""
+
+    # Get fraction of times where natU is used as reactor fuel
+    n_natU, n_repU = natU_to_repU_cycles(fname, irradiation_time, burnup,
+                                         verbose=False)
+    fraction_natU = n_natU / (n_natU+n_repU)
     
     # + 1 because of the stored fuel assembly and + 1 for the incomplete
     # reactor cycle at the end of the simulation.
     n_reactor_cycles = reactor_cycles(irradiation_time) + 2
-    fraction_natU_to_repU = 5 / 7
     time_reactor_enrichment = (n_reactor_cycles * enrichment_reactorgrade()
-                               * fraction_natU_to_repU)
+                               * fraction_natU)
     time_heu_enrichment = SIM_DUR - time_reactor_enrichment
-    
     m = Multi_isotope({'234': 0.0054, '235': (0.7204, 90., 0.3)},
                       feed=10000, alpha235=1.35, process='centrifuge',
                       downblend=True)
@@ -39,8 +58,6 @@ def expected_heu(irradiation_time):
     heu_per_cycle = m.p
     total_heu = heu_per_cycle * time_heu_enrichment
 
-    print(time_heu_enrichment)
-    print(f'Weapongrade U per enrichment step: {heu_per_cycle:.3f} kg')
     print((f'Total weapongrade U: {total_heu:.1f} kg, using an irradiation'
           + f' time of {irradiation_time}'))
     
@@ -67,19 +84,31 @@ def enrichment_reactorgrade(verbose=False):
 
     return n_steps
 
-def spent_reprocessed_uranium(irradiation_time, verbose=False):
-    # Uranium content taken from SERPENT output file
-    uranium_content = (0.988404066305649 + 0.0102986527882519 
-                       + 0.000198774018864621 + 8.88584554656443e-05
-                       + 1.07743552265805e-06 + 5.38515760293621e-07)
+def spent_reprocessed_uranium(burnup, irradiation_time, verbose=False):
+    if burnup=='0.5MWd':
+        fname = os.path.join(DATA_PATH, 'SERPENT_outputs_RepU_05MWd_percentages.npy')
+
+    elif burnup=='2MWd':
+        fname = os.path.join(DATA_PATH, 'SERPENT_outputs_RepU_2MWd_percentages.npy')
+    else:
+        raise ValueError("'burnup' has to be either '0.5MWd' or '2MWd'")
+    
+    data = np.load(fname, allow_pickle=True).item()
+    data = data[burnup]
+    
+    uranium_content = 0
+    for key, val in data.items():
+        if key in [f'U{iso}' for iso in range(232, 239)]:
+            uranium_content += val
+
     spent_batch = CORE_MASS * SEPARATION_EFFICIENCY * uranium_content
-    if verbose:
-        print(f'{spent_batch:.1f} kg of stored uranium per core')
 
     n_reactor_cycles = reactor_cycles(irradiation_time)
     # Minus 1 to account for one missing cycle
     spent_reprocessed = int(0.5 * n_reactor_cycles - 1) * spent_batch
-    print(f'{spent_reprocessed:.1f} kg of spent uranium in storage')
+
+    if verbose:
+        print(f'{spent_reprocessed/1000:.1f} t of spent uranium in storage')
 
     return spent_reprocessed
 
@@ -91,74 +120,97 @@ def reactor_cycles(irradiation_time, verbose=False):
                 // (irradiation_time + REFUELLING_TIME))
     
     if verbose:
-        print((f'Irradiation time of {irradiation_time} yiels {n_cycles} '
-               + 'cycles'))
+        print(f'Irradiation time of {irradiation_time} yields {n_cycles} '
+               + 'cycles')
 
     return n_cycles
 
-def expected_plutonium():
+def natU_to_repU_cycles(fname, irradiation_time, burnup, verbose=False):
+    """Get the number of reactor cyclues using repU and natU"""
+    data = np.load(fname, allow_pickle=True).item()
+    
+    data = data[burnup]
+
+    spentU_composition = {}
+    uranium_content = 0
+    # Get uranium content and isotopic composition of uranium
+    for key, val in data.items():
+        if key in [f'U{iso}' for iso in range(232, 239) if iso!=237]:
+            spentU_composition[key[1:]] = val  # remove the 'U' 
+            uranium_content += val
+    
+    # Normalise spent uranium's isotopic composition to 100 (percent)
+    for key, val in spentU_composition.items():
+        spentU_composition[key] = 100 * val / uranium_content
+
+    total_cycles = reactor_cycles(irradiation_time, False)
+    spent_batch = CORE_MASS * SEPARATION_EFFICIENCY * uranium_content
+    
+    spentU_composition['235'] = (spentU_composition['235'], 1.1, 0.3)
+    del spentU_composition['238']
+    m = Multi_isotope(spentU_composition, feed=spent_batch, alpha235=1.35,
+                      process='centrifuge', downblend=True)
+    m.calculate_staging()
+    repU_batch_mass = m.p
+    
+    cycle = 0  # timestep in the form of reactorcycles
+    repU_storage = 0
+    n_natU = 0
+    n_repU = 0
+    while cycle < total_cycles:
+        if repU_storage < CORE_MASS:
+            n_natU += 1
+            repU_storage += repU_batch_mass
+        else:
+            n_repU += 1
+            repU_storage -= CORE_MASS
+        cycle += 1      
+    
+    if verbose:
+        print(f"Out of {total_cycles} cycles, {n_natU} used fresh fuel and"
+              + f" {n_repU} used reprocessed fuel.")
+
+    return (n_natU, n_repU)
+
+def expected_plutonium(burnup, irradiation_time):
     """This is ugly coding don't look at it"""
 
-    path = '../data/'
+    data = [] 
+    data.append(get_plutonium(
+        os.path.join(DATA_PATH, 'SERPENT_outputs_NatU_percentages.npy'),
+        burnup))
+    if burnup=='0.5MWd':
+        pu = get_plutonium(os.path.join(DATA_PATH, 
+                'SERPENT_outputs_RepU_05MWd_percentages.npy'), burnup)
+        data.append(pu)
+    elif burnup=='2MWd':
+        pu = get_plutonium(os.path.join(DATA_PATH, 
+                'SERPENT_outputs_RepU_2MWd_percentages.npy'), burnup)
+        data.append(pu)
+    else:
+        raise ValueError("'burnup' has to be either '0.5MWd' or '2MWd'")
     
-    pu = [] 
-    pu.extend(get_composition(
-        os.path.join(path, 'SERPENT_outputs_NatU_percentages.npy')))
-    pu.extend(get_composition(
-        os.path.join(path, 'SERPENT_outputs_RepU_05MWd_percentages.npy'),
-        bu='0.5MWd'))
-    pu.extend(get_composition(
-        os.path.join(path, 'SERPENT_outputs_RepU_2MWd_percentages.npy'),
-        bu='2MWd'))
-    
-    n_enrichment_steps = enrichment_reactorgrade()
-    get_plutonium = lambda pu, n_cycles: (pu * n_cycles * CORE_MASS
-                                          * SEPARATION_EFFICIENCY)
- 
-    low_bu_natU = get_plutonium(pu[0], reactor_cycles(22))
-    low_bu_repU = get_plutonium(pu[2], reactor_cycles(22))
-    
-    high_bu_natU = get_plutonium(pu[1], reactor_cycles(88))
-    high_bu_repU = get_plutonium(pu[3], reactor_cycles(88))
-                                        
-    print('Pu for 0.5MWd: {} -- {}'.format(low_bu_repU, low_bu_natU))
-    print('Pu for 2.0MWd: {} -- {}'.format(high_bu_repU, high_bu_natU))
+    plutonium = np.array(data) 
+    plutonium *= (reactor_cycles(irradiation_time) * CORE_MASS 
+                  * SEPARATION_EFFICIENCY)
+    mean = np.mean(plutonium)
+    std = np.std(plutonium, ddof=1)
+    print(f"Pu for {burnup}: {mean:.1f} +- {std:.1f}")
 
     return
 
-def get_composition(fname, bu=None):
+def get_plutonium(fname, burnup):
     """Load the composition of spent fuel and filter it (e.g., only U)"""
-    
-    fuel = fname.split('_')[2]
-    burnup_fname = fname.split('_')[-2]
-
-    print(f"Extracting data for {fuel}, {burnup_fname}")
     data = np.load(fname, allow_pickle=True).item()
-   
-    bu = data.keys() if bu is None else [bu]
-    pu = []
-    for burnup in bu:
-        comp = {'waste': 0, 'U234': 0, 'U235': 0, 'U236': 0, 'U238': 0,
-                'Pu239': 0, 'Pu240': 0, 'Pu241': 0, 'Np239': 0}
-        print(f"Extracting data for burnup of {burnup}")
-        del data[burnup]['Burnup']
-        del data[burnup]['Irr_Time']
-        
-        for isotope, value in data[burnup].items():
-            if isotope not in comp.keys():
-                comp['waste'] += value
-            else:
-                comp[isotope] += value
-
-        #print(comp)
-        pu_comp = sum([data[burnup][key] 
-                          for key in ('Pu239', 'Pu240', 'Pu241')])
-        pu_comp += (1 - 2.**(-1./2.356)) * data[burnup]['Np239']
-        #pu_comp += 2.**(-1./2.356) * data[burnup]['U237']
-        print('Plutonium: {} %\n'.format(pu_comp*100))
-
-        pu.append(pu_comp)
+    data = data[burnup]
     
+    pu = 0
+    for isotope, value in data.items():
+        if isotope in ('Pu239', 'Pu240', 'Pu241'):
+            pu += value
+
+    pu += (1 - 2.**(-1./2.356)) * data['Np239']
+
     return pu
 
 if __name__=="__main__":
