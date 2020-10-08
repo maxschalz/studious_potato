@@ -11,7 +11,7 @@ DATA_PATH = '../data/'
 CORE_MASS = 110820  # in kg
 REFUELLING_TIME = 6  # in days
 SEPARATION_EFFICIENCY = 0.97 
-SIM_DUR = 730  # in days
+SIM_DUR = 729  # in days
 
 def main():
     spent_natU_fname = os.path.join(DATA_PATH,
@@ -32,7 +32,7 @@ def get_expectations(fname, irradiation_time, burnup, verbose=True):
     natU_to_repU_cycles(fname, irradiation_time, burnup, verbose)
     expected_plutonium(burnup, irradiation_time)
     expected_heu(fname, irradiation_time, burnup)
-    spent_reprocessed_uranium(burnup, irradiation_time, verbose)
+    spent_reprocessed_uranium(fname, burnup, irradiation_time, verbose)
     print("\n\n")
     
     return
@@ -43,19 +43,18 @@ def expected_heu(fname, irradiation_time, burnup):
     # Get fraction of times where natU is used as reactor fuel
     n_natU, n_repU = natU_to_repU_cycles(fname, irradiation_time, burnup,
                                          verbose=False)
-    fraction_natU = n_natU / (n_natU+n_repU)
-    
+
     # + 1 because of the stored fuel assembly and + 1 for the incomplete
     # reactor cycle at the end of the simulation.
-    n_reactor_cycles = reactor_cycles(irradiation_time) + 2
-    time_reactor_enrichment = (n_reactor_cycles * enrichment_reactorgrade()
-                               * fraction_natU)
+    time_reactor_enrichment = (n_natU + 2) * enrichment_reactorgrade()
     time_heu_enrichment = SIM_DUR - time_reactor_enrichment
+
     m = Multi_isotope({'234': 0.0054, '235': (0.7204, 90., 0.3)},
                       feed=10000, alpha235=1.35, process='centrifuge',
                       downblend=True)
     m.calculate_staging()
     heu_per_cycle = m.p
+
     total_heu = heu_per_cycle * time_heu_enrichment
 
     print((f'Total weapongrade U: {total_heu:.1f} kg, using an irradiation'
@@ -64,27 +63,32 @@ def expected_heu(fname, irradiation_time, burnup):
     return total_heu
 
 def enrichment_reactorgrade(verbose=False):
-    """Get the number of enrichment cycles needed to produce one SRS core
+    """Get the (non-int) timesteps needed to produce one SRS core
     
     This function returns the number of enrichment cycles needed to enrich 
     NatU to 1.1% making it usable in the Savannah River Site reaction. One
     full reactor core contains 110820 kg SEU and we assume that in one step
     10'000 kg of uranium are used as feed.
+
+    While timesteps typically are integers, this is not the case here. 
+    Using floats has the advantage that the enrichment in the last step is
+    reflected better, as the facility retains some capacity that can 
+    subsequently be used to enrich natural uranium to HEU.
     """
     m = Multi_isotope({'234': 0.0054, '235': (0.7204, 1.1, 0.3)},
                       feed=10000, alpha235=1.35, process='centrifuge',
                       downblend=True)
     m.calculate_staging()
     product = m.p
-
-    n_steps = int(CORE_MASS / product) + 1
-
+    
+    n_steps = CORE_MASS / product
     if verbose:
         print(f'{n_steps} enrichment cycles needed.')
 
     return n_steps
 
-def spent_reprocessed_uranium(burnup, irradiation_time, verbose=False):
+def spent_reprocessed_uranium(fname, burnup, irradiation_time, 
+                              verbose=False):
     if burnup=='0.5MWd':
         fname = os.path.join(DATA_PATH, 'SERPENT_outputs_RepU_05MWd_percentages.npy')
 
@@ -103,9 +107,9 @@ def spent_reprocessed_uranium(burnup, irradiation_time, verbose=False):
 
     spent_batch = CORE_MASS * SEPARATION_EFFICIENCY * uranium_content
 
-    n_reactor_cycles = reactor_cycles(irradiation_time)
-    # Minus 1 to account for one missing cycle
-    spent_reprocessed = int(0.5 * n_reactor_cycles - 1) * spent_batch
+    n_reactor_cycles = natU_to_repU_cycles(fname, irradiation_time, 
+                                           burnup)[1]
+    spent_reprocessed = n_reactor_cycles * spent_batch
 
     if verbose:
         print(f'{spent_reprocessed/1000:.1f} t of spent uranium in storage')
@@ -164,11 +168,15 @@ def natU_to_repU_cycles(fname, irradiation_time, burnup, verbose=False):
         else:
             n_repU += 1
             repU_storage -= CORE_MASS
-        cycle += 1      
-    
+        cycle += 1
+
     if verbose:
         print(f"Out of {total_cycles} cycles, {n_natU} used fresh fuel and"
               + f" {n_repU} used reprocessed fuel.")
+        if repU_storage < CORE_MASS:
+            print(f"Last, incomplete cycle uses natU")
+        else:
+            print(f"Last, incomplete cycle uses natU")
 
     return (n_natU, n_repU)
 
