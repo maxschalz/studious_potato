@@ -178,33 +178,41 @@ class Plotter:
 
 
 class Analyser:
-    """
+    """Helper class connecting to the .sqlite-file, doing queries etc.
+    
     A helper class that features functions to do queries, get all of the
     agents, their archetypes and agentIds, list inventories, etc...
     """
-    def __init__(self, path, fname):
-        self.path = path
+    def __init__(self, fname):
+        """Connect to the .sqlite file and get basic simulation information
+
+        Keyword arguments:
+        fname -- filename of the Cyclus output file (.sqlite) including the
+                 path
+        """
         self.fname = fname
-        
-        self.connection = sqlite3.connect(
-            os.path.join(path, fname+".sqlite")
-        )
+        self.connection = sqlite3.connect(fname)
         self.cursor = self.connection.cursor()
+        print(f"Connection to file {fname.split('/')[-1]} established.")
+        
         self.t_init = self.get_initial_time()
         self.duration = self.query("Duration", "Info")[0]
 
         # (key,value): (agentId, name), (name, agentId),
         #              (spec, agentId), (agentId, spec)
-        (self.agents,
-         self.names, 
-         self.specs, 
-         self.agentIds) = self.get_agents()
-        
+        agents = self.get_agents()
+        self.agents = agents[0]
+        self.names = agents[1]
+        self.specs = agents[2]
+        self.agentIds = agents[3]
+
         return
     
     def __del__(self):
+        """Close the connection to the .sqlite file"""
         self.connection.close()
-        print("Connection to file {}.sqlite closed.".format(self.fname))
+        filename = self.fname.split("/")[-1]
+        print(f"Connection to file {filename} closed.")
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # Do a query of the database
@@ -270,7 +278,7 @@ class Analyser:
             name = str(data[i][2])
 
             agents[agentId] = name
-            names[name.lower()] = agentId
+            names[name] = agentId
             specs[spec].append(agentId)
             agentIds[agentId] = spec
     
@@ -307,7 +315,7 @@ class Analyser:
     # Returns:  - corresponding agentId or np.ndarray with agentIds 
     def convert_to_AgentId(self, agentId):
         if isinstance(agentId, str):
-            returnVal = self.names[agentId.lower()]
+            returnVal = self.names[agentId]
         
         elif isinstance(agentId, collections.abc.Iterable):
             returnVal = np.empty(len(agentId), dtype=int)
@@ -416,7 +424,8 @@ class Analyser:
     # of said commodity.
     # Returns:  - np.array, shape(2, len(time)),
     #             where arr[0] = time, arr[1] = qty
-    def agent_inventory(self, agentId, fill_array=True):
+    def agent_inventory(self, agentId, fill_array=True, add_zero=False,
+                        add_end=0):
         # (key, value) = (time, qty)
         transactions = collections.defaultdict(float) 
         
@@ -454,6 +463,15 @@ class Analyser:
         for i in range(1, len(inventory[1])):
             inventory[1, i] += inventory[1, i - 1]
         
+        if add_zero:
+            inventory = np.concatenate(([[0, inventory[0,0]],
+                                         [0, 0]], inventory),
+                                       axis=1)
+
+        if add_end and (inventory[0,-1] != add_end):
+            inventory = np.concatenate((inventory,
+                                        [[add_end], [inventory[1,-1]]]), 
+                                       axis=1)
         return inventory
 
 """
