@@ -2,6 +2,9 @@
 import collections
 import datetime
 import dateutil
+import matplotlib
+matplotlib.use('pgf')
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
@@ -9,11 +12,57 @@ import re
 import sqlite3
 import warnings
 
-import matplotlib
-matplotlib.use("TKAgg")
-#matplotlib.rcParams.update({"font.size": 14})
-import matplotlib.pyplot as plt
+from pyne.data import atomic_mass
 
+import plotsettings
+plt.style.use('seaborn')
+plt.rcParams.update(plotsettings.tex_fonts())
+
+def atom_to_mass_frac(atom):
+    """Convert input in atomic fraction to mass fraction"""
+    if type(atom) is np.ndarray:
+        if len(atom) != 6:
+            raise ValueError("Array has to be of len 6 (U232 to U236, U238)")
+        isotopes = [f"92{i}0000" for i in range(232, 239) if i != 237]
+        masses = np.array([atomic_mass(iso) for iso in isotopes])
+
+        mass = atom * masses
+        mass /= mass.sum()
+        
+        return mass
+    
+    mass = {}
+    normalisation = 0
+    for key, value in atom.items():
+        if key > 250 or key < 1:
+            raise KeyError('Keys have to be the atomic masses, '
+                           + 'not NucIds or something else.')
+        val = value * key
+        mass[key] = val
+        normalisation += val
+
+    for key in mass.keys():
+        mass[key] /= normalisation
+    
+    return mass
+
+def mass_to_atom_frac(mass):
+    """Convert input in mass fraction to atomic fraction"""
+    atom = {}
+    normalisation = 0
+    for key, value in mass.items():
+        if key > 250 or key < 1:
+            raise KeyError('Keys have to be the atomic masses, '
+                           + 'not NucIds or something else.')
+        val = value / key
+        atom[key] = val
+        normalisation += val
+
+    for key in atom.keys():
+        atom[key] /= normalisation
+    
+    return atom
+    
 class Plotter:
     """
     A helper class defining plotting styles, focussing especially onto
