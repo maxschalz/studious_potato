@@ -159,24 +159,34 @@ def natU_to_repU_cycles(fname, irradiation_time, burnup, verbose=False):
     
     cycle = 0  # timestep in the form of reactorcycles
     repU_storage = 0
+    temp_dict = {}
     n_natU = 0
     n_repU = 0
     while cycle < total_cycles:
+        # This weird dictionary part has to be done in order to reflect 
+        # spent fresh fuel from a reactor can not be used in the subsequent
+        # cycle but only in the second to next cycle because of the
+        # in-between stations (reprocessing and enrichment).
+        try:
+            repU_storage += temp_dict[cycle-2]
+            del temp_dict[cycle-2]
+        except KeyError:
+            pass
         if repU_storage < CORE_MASS:
             n_natU += 1
-            repU_storage += repU_batch_mass
+            temp_dict[cycle] = repU_batch_mass
         else:
             n_repU += 1
             repU_storage -= CORE_MASS
         cycle += 1
-
+    
     if verbose:
         print(f"Out of {total_cycles} cycles, {n_natU} used fresh fuel and"
               + f" {n_repU} used reprocessed fuel.")
         if repU_storage < CORE_MASS:
             print(f"Last, incomplete cycle uses natU")
         else:
-            print(f"Last, incomplete cycle uses natU")
+            print(f"Last, incomplete cycle uses repU")
 
     return (n_natU, n_repU)
 
