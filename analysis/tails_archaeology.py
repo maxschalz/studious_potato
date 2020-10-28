@@ -11,6 +11,11 @@ plt.rcParams.update(ps.tex_fonts())
 
 from tails_miso_calculator import Multi_isotope
 
+def main():
+    #tails_concentration()
+    #product_qt()
+    product_qty_unknown_feed()
+
 def tails_concentration():
     """Calculate the possible enrichment given tails U234 concentrations
     """
@@ -58,8 +63,9 @@ def tails_concentration():
 def product_qty():
     """Determine the amount of product after finding out its assay
     """
-
-    u235_grade = (3, 5, 20, 90)
+    # Updated upstream
+    #u235_grade = (3, 5, 20, 90)
+    u235_grade = (2.7, 3, 5, 20, 81, 90)
     tails = np.linspace(100, 6500, 100)
     product = np.empty(shape=(len(tails), len(u235_grade)), dtype=float) 
 
@@ -85,16 +91,57 @@ def product_qty():
     ax.set_yscale('log')
     ax.legend(title=r"$x_{235,P}$ [\%at]")
     
+    for i, xp in enumerate(u235_grade):
+        if xp not in (2.7, 81):
+            continue
+        print(f"Enrichment level of {xp}%")
+        print(f"Absolute deviation: {product[:,i+1]-product[:,i]}")
+        print(f"Relative deviation: {(product[:,i+1]-product[:,i]) / product[:,i+1]}")
+
     plt.tight_layout()
     plt.savefig('../plots/productqty_vs_tailsqty.pdf')
     plt.close() 
 
     return
     
-def main():
-    tails_concentration()
-    product_qty()
-    
+def product_qty_unknown_feed():
+    """Determine the amount of product after finding out its assay
+    """
 
+    u235_grade = (3, 20, 90)
+    tails = np.linspace(100, 6500, 100)
+    product = np.empty(shape=(len(tails), len(u235_grade), 2), dtype=float) 
+
+    for i, t in enumerate(tails):
+        for j, u235 in enumerate(u235_grade):
+            for k, u234 in enumerate((5.4e-3, 5.1e-3)):
+                concentration = {'234': u234, '235': (0.711, u235, 0.3)}
+                m = Multi_isotope(concentration, process='centrifuge', 
+                                  alpha235=1.3, tails=t)
+                m.calculate_staging()
+                product[i,j,k] = m.p
+       
+    fig, ax = plt.subplots(figsize=ps.set_size())
+    for i in range(len(u235_grade)):
+        ax.plot(tails, product[:,i,0], label=r'{}'.format(u235_grade[i]),
+                linestyle=ps.linestyles(i), color=ps.colors(i))
+        ax.fill_between(tails, product[:,i,0], product[:,i,1],
+                        linestyle=ps.linestyles(i), color=ps.colors(i))
+    
+    bomb = np.argmin(np.abs(product[:,-1,0]-27.8))
+    ax.scatter(tails[bomb], product[bomb,-1,0], marker='*', s=88,
+               color='C2', label='1 SQ U-235')
+    ax.set_xlabel("tails quantity [kg]")
+    ax.set_ylabel("product quantity [kg]")
+    ax.set_xlim(0, tails[-1])
+    ax.set_yscale('log')
+    ax.legend(title=r"$x_{235,P}$ [\%at]")
+    
+    plt.tight_layout()
+    plt.savefig('../plots/productqty_vs_tailsqty_feed_uncertainty.pdf')
+    plt.close() 
+
+    return
+   
 if __name__=='__main__':
     main()
