@@ -5,7 +5,7 @@ matplotlib.use('pgf')
 import matplotlib.pyplot as plt
 import numpy as np
 
-plt.style.use('seaborn')
+plt.style.use('seaborn-darkgrid')
 import plotsettings as ps
 plt.rcParams.update(ps.tex_fonts())
 
@@ -89,8 +89,8 @@ def plot():
 
     k = np.array([2.31, 3.94])
     
-    fs = ps.set_size(subplots=(2, 1), fraction=0.8)
-    fig, ax = plt.subplots(2, 1, figsize=fs, sharex=True)
+    fs = ps.set_size(subplots=(1, 2), higher=True)
+    fig, ax = plt.subplots(1, 2, figsize=fs)
 
     for i, (kk, ff) in enumerate(zip(k, f_opt)):
         countercurrent_to_feed = kk * ff / feed
@@ -102,6 +102,7 @@ def plot():
         ax[1].plot(feed * 1e6, alpha, label=r'$k = {}$'.format(kk),
                    linestyle=ps.linestyles(i)) 
 
+    ax[0].set_xlabel('Feed rate [mg/s]')
     ax[0].set_ylabel('Separative power [kg SWU/yr]')
     ax[0].legend()
     

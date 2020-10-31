@@ -66,7 +66,7 @@ def set_size(width='book', fraction=1, subplots=(1, 1), higher=False):
 
     if higher:
         fig_height_in = (fig_width_in * golden_ratio 
-                         * (subplots[0] * 1.3 / subplots[1]))
+                         * (subplots[0] * 1.5 / subplots[1]))
     else:
         fig_height_in = (fig_width_in * golden_ratio 
                          * (subplots[0] / subplots[1]))
