@@ -5,16 +5,16 @@ matplotlib.use('pgf')
 import matplotlib.pyplot as plt
 import numpy as np
 
-plt.style.use('seaborn')
+plt.style.use('seaborn-darkgrid')
 import plotsettings as ps
 plt.rcParams.update(ps.tex_fonts())
 
 from tails_miso_calculator import Multi_isotope
 
 def main():
-    #tails_concentration()
-    #product_qt()
-    product_qty_unknown_feed()
+    plot()
+
+    return
 
 def tails_concentration():
     """Calculate the possible enrichment given tails U234 concentrations
@@ -40,32 +40,53 @@ def tails_concentration():
 
     print(f"For x(tails,234) = {wgu_234}, the enrichment assay lies "
           + f"between {leu} and {wgu}.")
+    
+    return xp, tails
 
-
-    fig, ax = plt.subplots(figsize=ps.set_size())
-    ax.plot(xp, tails[:,1], label=r'$5.4\times10^{-3}$',
-            color=ps.colors(0), linestyle=ps.linestyles(0))
-    ax.plot(xp, tails[:,0], label=r'$5.1\times10^{-3}$',
-            color=ps.colors(1), linestyle=ps.linestyles(1))
-    ax.fill_between(xp, tails[50,0], tails[50,1], color='C2', alpha=0.2,
-                    label="distinction\nimpossible")
-    ax.set_xlabel(r'$x_{235,P}$ [%at]')
-    ax.set_ylabel(r'$x_{234,T}$ [%at]')
-    ax.set_xlim(0,100)
+def plot():
+    xp, tails = tails_concentration()
+    tails_qty, product, u235_grade, bomb = product_qty()
+ 
+    fig, ax = plt.subplots(figsize=ps.set_size(fraction=0.7))
+    ax.plot(tails[:,1], xp, label=r'$5.4\times10^{-3}$',
+               color=ps.colors(0), linestyle=ps.linestyles(0))
+    ax.plot(tails[:,0], xp, label=r'$5.1\times10^{-3}$',
+               color=ps.colors(1), linestyle=ps.linestyles(1))
+    ax.fill_betweenx(xp, tails[50,0], tails[50,1], color='C3', 
+                        alpha=0.2, label="distinction\nimpossible")
+    ax.set_xlabel(r'$x_{234,T}$ [%at]')
+    ax.set_ylabel(r'$x_{235,P}$ [%at]')
+    ax.set_ylim(0,100)
     ax.legend(title='$x_{234,F}$ [%at]')
-
+    
     plt.tight_layout()
     plt.savefig('../plots/tails_product_enrich.pdf')
     plt.close()
+
+
+    fig, ax = plt.subplots(figsize=ps.set_size(fraction=0.8))
+    for i in range(len(u235_grade)):
+        ax.plot(tails_qty, product[:,i], linestyle=ps.linestyles(i), 
+                   label=r'{}'.format(u235_grade[i]), color=ps.colors(i))
     
+    ax.scatter(tails_qty[bomb], product[bomb, -1], marker='*', s=88,
+                  color='C3', label='1 SQ U-235')
+    ax.set_xlabel("tails quantity [kg]")
+    ax.set_ylabel("product quantity [kg]")
+    ax.set_xlim(0, tails_qty[-1])
+    ax.set_yscale('log')
+    ax.legend(title=r"$x_{235,P}$ [\%at]", ncol=3)
+    
+    plt.tight_layout()
+    plt.savefig('../plots/tails_product_quantity.pdf')
+    plt.close()
+
     return
 
 def product_qty():
     """Determine the amount of product after finding out its assay
     """
-    # Updated upstream
-    #u235_grade = (3, 5, 20, 90)
-    u235_grade = (2.7, 3, 5, 20, 81, 90)
+    u235_grade = (3, 5, 20, 90)
     tails = np.linspace(100, 6500, 100)
     product = np.empty(shape=(len(tails), len(u235_grade)), dtype=float) 
 
@@ -77,32 +98,9 @@ def product_qty():
             m.calculate_staging()
             product[i,j] = m.p
    
-    fig, ax = plt.subplots(figsize=ps.set_size())
-    for i in range(len(u235_grade)):
-        ax.plot(tails, product[:,i], label=r'{}'.format(u235_grade[i]),
-                linestyle=ps.linestyles(i), color=ps.colors(i))
-    
     bomb = np.argmin(np.abs(product[:,-1]-27.8))
-    ax.scatter(tails[bomb], product[bomb, -1], marker='*', s=88,
-               color='C2', label='1 SQ U-235')
-    ax.set_xlabel("tails quantity [kg]")
-    ax.set_ylabel("product quantity [kg]")
-    ax.set_xlim(0, tails[-1])
-    ax.set_yscale('log')
-    ax.legend(title=r"$x_{235,P}$ [\%at]")
     
-    for i, xp in enumerate(u235_grade):
-        if xp not in (2.7, 81):
-            continue
-        print(f"Enrichment level of {xp}%")
-        print(f"Absolute deviation: {product[:,i+1]-product[:,i]}")
-        print(f"Relative deviation: {(product[:,i+1]-product[:,i]) / product[:,i+1]}")
-
-    plt.tight_layout()
-    plt.savefig('../plots/productqty_vs_tailsqty.pdf')
-    plt.close() 
-
-    return
+    return tails, product, u235_grade, bomb
     
 def product_qty_unknown_feed():
     """Determine the amount of product after finding out its assay
