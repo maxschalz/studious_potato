@@ -1,1 +1,22 @@
-# studious_potato
+# studious\_potato
+
+This repository contains code developed during my master's thesis.
+It does not include Cyclus, Cycamore or Misonenrichment, which are avaible
+here (in brackets the version used):
+
+- [Cyclus](https://github.com/cyclus/cyclus) (v1.5.5)
+- [Cycamore](https://github.com/cyclus/cycamore) (v1.5.5)
+- [Misoenrichment](https://github.com/maxschalz/miso_enrichment) (v1.0)
+
+All Python scripts are written for Python 3.6. Additional Python libraries
+are needed such as SciPy, NumPy, Matplotlib, Pandas and Sqlite3.
+
+## data
+The `data` folder contains the SERPENT output files featuring the reactor
+simulation, as well as digitised data from publications to counter-check 
+data.
+It does _not_ include the Cyclus output files. However, each folder 
+contains the input files, thus the simulations can easily be recreated.
+
+## analysis
+This `folder` contains all the analysis scripts.
