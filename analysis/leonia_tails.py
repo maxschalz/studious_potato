@@ -3,8 +3,6 @@
 import numpy as np
 import re
 from scipy.optimize import minimize
-import sys
-sys.path.append("../../enrichment/src/")
 
 from analyser import Analyser
 from multi_isotope_calculator import Multi_isotope

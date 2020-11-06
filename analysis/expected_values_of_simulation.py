@@ -2,8 +2,6 @@
 
 import numpy as np
 import os
-import sys
-sys.path.append('../../enrichment/src')
 
 from multi_isotope_calculator import Multi_isotope
 

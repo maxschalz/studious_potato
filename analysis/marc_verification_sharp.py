@@ -4,8 +4,6 @@ import matplotlib
 matplotlib.use('pgf')
 import matplotlib.pyplot as plt
 import numpy as np
-import sys
-sys.path.append('../../enrichment/src/')
 
 from multi_isotope_calculator import Multi_isotope
 
