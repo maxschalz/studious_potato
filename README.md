@@ -20,3 +20,9 @@ contains the input files, thus the simulations can easily be recreated.
 
 ## analysis
 This `folder` contains all the analysis scripts.
+
+## License
+The source code, i.e. the code found in `analysis` and `data`, is licensed under the 
+[BSD-3 Clause License](https://github.com/maxschalz/studious_potato/blob/main/LICENSE).
+The thesis, the defence presentation and the corresponding work, all found in `thesis` and `presentation`, are licensed under the 
+[Creative Commons Attribution 4.0 International license](https://creativecommons.org/licenses/by/4.0/).
