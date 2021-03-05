@@ -17,6 +17,8 @@ simulation, as well as digitised data from publications to counter-check
 data.
 It does _not_ include the Cyclus output files. However, each folder 
 contains the input files, thus the simulations can easily be recreated.
+In order for the simulation to work, it must be called from within the 
+`input_files` directory.
 
 ## analysis
 This `folder` contains all the analysis scripts.
