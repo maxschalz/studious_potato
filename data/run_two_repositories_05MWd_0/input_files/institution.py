@@ -1,8 +1,3 @@
-import sys
-sys.path.append(
-    "/Users/test/Uni/Masterarbeit/thesis_simulations/input/test_transfers/"
-)
-
 import facility
 
 def institution(burnup):

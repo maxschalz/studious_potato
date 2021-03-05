@@ -1,8 +1,3 @@
-import sys
-sys.path.append(
-    "/Users/test/Uni/Masterarbeit/thesis_simulations/input/test_transfers/"
-)
-
 def facility(burnup):
     if burnup == '0.5MWd':
         cycle_time = 22  # days

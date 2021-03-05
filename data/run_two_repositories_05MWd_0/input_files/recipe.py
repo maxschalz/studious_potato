@@ -1,12 +1,13 @@
 import numpy as np
 
 def recipe(spent_fuel, spent_rep_fuel, burnup):
-    spent_fuel_comp = np.load(spent_fuel).item()
+    spent_fuel_comp = np.load(spent_fuel, allow_pickle=True).item()
     spent_fuel_composition = spent_fuel_comp[burnup]
     del spent_fuel_composition['Burnup']
     del spent_fuel_composition['Irr_Time']
     
-    spent_rep_fuel_comp = np.load(spent_rep_fuel).item()
+    spent_rep_fuel_comp = np.load(spent_rep_fuel, 
+                                  allow_pickle=True).item()
     spent_rep_fuel_composition = spent_rep_fuel_comp[burnup]
     del spent_rep_fuel_composition['Burnup']
     del spent_rep_fuel_composition['Irr_Time']

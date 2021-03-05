@@ -1,8 +1,6 @@
 import os
 import sys
-sys.path.append(
-    "/Users/test/Uni/Masterarbeit/thesis_simulations/input/test_transfers/"
-)
+sys.path.append("./")
 
 import archetypes
 import commodity
@@ -13,7 +11,7 @@ import recipe
 import region
 
 def simulation():
-    data_path = "/Users/test/Uni/Masterarbeit/thesis_simulations/data"
+    data_path = "../.."
     
     #burnup = '0.5MWd'
     burnup = '2MWd'
